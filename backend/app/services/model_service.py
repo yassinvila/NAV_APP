@@ -90,6 +90,13 @@ def _load_model_bundle(model_name_or_path: str, hf_token: str):
                 import torch
 
                 model = torch.load(quantized_checkpoint, map_location="cpu", weights_only=False)
+                # The trusted checkpoint is a whole-object pickle created by a
+                # different Transformers release. Render runs single-device
+                # CPU inference, so restore the legacy flags expected by
+                # Transformers 4.x without enabling model parallelism.
+                model.model_parallel = False
+                model.encoder.model_parallel = False
+                model.decoder.model_parallel = False
             except Exception as exc:
                 raise ModelServiceError(f"Quantized checkpoint loading failed: {exc}") from exc
         else:
