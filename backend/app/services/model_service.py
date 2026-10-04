@@ -38,12 +38,13 @@ def _load_model_bundle(model_name_or_path: str, hf_token: str):
     try:
         # Inspect the repo contents first to provide a clearer error when
         # the target repo is not a transformers-compatible model.
+        repo_files = None
         try:
             from huggingface_hub import HfApi
 
             api = HfApi()
             try:
-                repo_files = api.list_repo_files(model_name_or_path, token=hf_token)
+                repo_files = api.list_repo_files(model_name_or_path, token=hf_token or None)
             except Exception:
                 repo_files = None
 
@@ -66,14 +67,26 @@ def _load_model_bundle(model_name_or_path: str, hf_token: str):
             # Non-fatal: if listing fails, we'll let from_pretrained raise the original error.
             pass
 
-        tokenizer = T5TokenizerFast.from_pretrained(model_name_or_path, token=hf_token or None)
-        quantized_checkpoint = Path(model_name_or_path) / "quantized_model.pt"
+        model_path = Path(model_name_or_path)
+        if repo_files and "quantized_model.pt" in repo_files and not model_path.is_dir():
+            from huggingface_hub import snapshot_download
+
+            model_path = Path(
+                snapshot_download(
+                    repo_id=model_name_or_path,
+                    repo_type="model",
+                    token=hf_token or None,
+                )
+            )
+
+        tokenizer = T5TokenizerFast.from_pretrained(str(model_path), token=hf_token or None)
+        quantized_checkpoint = model_path / "quantized_model.pt"
         if quantized_checkpoint.is_file():
             import torch
 
             model = torch.load(quantized_checkpoint, map_location="cpu", weights_only=False)
         else:
-            model = T5ForConditionalGeneration.from_pretrained(model_name_or_path, token=hf_token or None)
+            model = T5ForConditionalGeneration.from_pretrained(str(model_path), token=hf_token or None)
         model.eval()
         return tokenizer, model
     except Exception as exc:
