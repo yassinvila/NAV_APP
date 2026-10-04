@@ -25,9 +25,18 @@ class Settings(BaseSettings):
 
     model_name_or_path: str = ""
     model_input_prefix: str = ""
+    hf_token: str = ""
+    t5_nemo: str = ""
+    t5_claude: str = ""
+    hf_token_two: str = ""
+    default_model_key: str = "T5_NEMO"
 
     default_route_profile: str = "driving"
     request_timeout_seconds: int = 15
+    jwt_secret: str = "local-demo-jwt-secret-change-before-production"
+    jwt_expiration_minutes: int = 1440
+    rate_limit_requests: int = 60
+    rate_limit_window_seconds: int = 60
 
 
 @lru_cache(maxsize=1)

@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from math import atan2, cos, radians, sin, sqrt
+from urllib.parse import quote
 from typing import Any
 
 import requests
@@ -16,14 +17,48 @@ class MapboxServiceError(RuntimeError):
 class MapboxService:
     settings: Any
 
-    def geocode_place(self, destination_name: str) -> DestinationCandidate:
-        url = f"{self.settings.mapbox_geocoding_url}/{requests.utils.quote(destination_name)}.json"
+    def geocode_place(
+        self,
+        destination_name: str,
+        latitude: float | None = None,
+        longitude: float | None = None,
+    ) -> DestinationCandidate:
+        if latitude is not None and longitude is not None:
+            try:
+                return self.search_place_nearby(destination_name, latitude, longitude)
+            except MapboxServiceError:
+                pass
+
+        url = f"{self.settings.mapbox_geocoding_url}/{quote(destination_name)}.json"
         params = {
             "access_token": self.settings.mapbox_access_token,
             "limit": 1,
         }
         data = self._request_json(url, params)
         return self._first_candidate(data, destination_name)
+
+    def search_place_nearby(self, query: str, latitude: float, longitude: float) -> DestinationCandidate:
+        url = "https://api.mapbox.com/search/searchbox/v1/forward"
+        params = {
+            "access_token": self.settings.mapbox_access_token,
+            "q": query,
+            "limit": 5,
+            "proximity": f"{longitude},{latitude}",
+            "types": "poi",
+            "auto_complete": "true",
+        }
+        data = self._request_json(url, params)
+        return self._first_candidate(data, query)
+
+    def reverse_geocode(self, latitude: float, longitude: float) -> str:
+        url = f"{self.settings.mapbox_geocoding_url}/{longitude},{latitude}.json"
+        params = {
+            "access_token": self.settings.mapbox_access_token,
+            "limit": 1,
+        }
+        data = self._request_json(url, params)
+        candidate = self._first_candidate(data, f"{latitude},{longitude}")
+        return candidate.name
 
     def search_category(
         self,
@@ -32,24 +67,26 @@ class MapboxService:
         longitude: float,
         selection_rule: str,
     ) -> DestinationCandidate:
-        url = f"{self.settings.mapbox_geocoding_url}/{requests.utils.quote(category)}.json"
-        params = {
-            "access_token": self.settings.mapbox_access_token,
-            "proximity": f"{longitude},{latitude}",
-            "limit": 10,
-            "types": "poi",
-        }
-        data = self._request_json(url, params)
-        features = data.get("features", [])
-        if not features:
-            raise MapboxServiceError(f"No results found for category '{category}'")
+        try:
+            url = f"https://api.mapbox.com/search/searchbox/v1/category/{quote(category)}"
+            params = {
+                "access_token": self.settings.mapbox_access_token,
+                "proximity": f"{longitude},{latitude}",
+                "limit": 10,
+            }
+            data = self._request_json(url, params)
+            features = data.get("features", [])
+            if not features:
+                raise MapboxServiceError(f"No results found for category '{category}'")
 
-        candidates = [self._feature_to_candidate(feature) for feature in features]
-        if selection_rule == "nearest":
-            return min(candidates, key=lambda candidate: self._distance_km(latitude, longitude, candidate.latitude, candidate.longitude))
-        if selection_rule == "best":
-            return max(candidates, key=lambda candidate: candidate.relevance or 0.0)
-        return candidates[0]
+            candidates = [self._feature_to_candidate(feature) for feature in features]
+            if selection_rule == "nearest":
+                return min(candidates, key=lambda candidate: self._distance_km(latitude, longitude, candidate.latitude, candidate.longitude))
+            if selection_rule == "best":
+                return max(candidates, key=lambda candidate: candidate.relevance or 0.0)
+            return candidates[0]
+        except MapboxServiceError:
+            return self.search_place_nearby(category, latitude, longitude)
 
     def route(self, origin: tuple[float, float], destination: tuple[float, float]) -> dict[str, Any]:
         origin_lat, origin_lon = origin
@@ -97,11 +134,17 @@ class MapboxService:
         center = feature.get("center") or feature.get("geometry", {}).get("coordinates")
         if not center or len(center) < 2:
             raise MapboxServiceError("Mapbox feature did not include coordinates")
+        properties = feature.get("properties", {}) if isinstance(feature.get("properties"), dict) else {}
         return DestinationCandidate(
-            name=feature.get("place_name") or feature.get("text") or "Unknown destination",
+            name=
+                feature.get("place_name")
+                or properties.get("full_address")
+                or properties.get("name")
+                or feature.get("text")
+                or "Unknown destination",
             latitude=center[1],
             longitude=center[0],
-            relevance=feature.get("relevance"),
+            relevance=feature.get("relevance") or feature.get("score") or properties.get("relevance"),
             raw=feature,
         )
 

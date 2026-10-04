@@ -57,6 +57,7 @@ class NavigationRequest(BaseModel):
     user_id: int
     text: str
     current_location: Location
+    model_key: Optional[Literal["T5_NEMO", "T5_CLAUDE"]] = None
 
     @field_validator("text")
     @classmethod
@@ -77,6 +78,8 @@ class BetaPinResponse(BaseModel):
 class RegisterRequest(BaseModel):
     username: str
     password: str
+    home_address: str
+    work_address: str
 
     @field_validator("username")
     @classmethod
@@ -92,6 +95,20 @@ class RegisterRequest(BaseModel):
             raise ValueError("password cannot be empty")
         return value
 
+    @field_validator("home_address")
+    @classmethod
+    def home_address_must_not_be_empty(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("home_address cannot be empty")
+        return value
+
+    @field_validator("work_address")
+    @classmethod
+    def work_address_must_not_be_empty(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("work_address cannot be empty")
+        return value
+
 
 class LoginRequest(BaseModel):
     username: str
@@ -105,12 +122,14 @@ class AuthUser(BaseModel):
 
 class AuthResponse(BaseModel):
     user: AuthUser
+    access_token: str
+    token_type: str = "bearer"
 
 
 class ParsedCommand(BaseModel):
     intent: Intent
     destination_name: Optional[str] = None
-    destination_category: Optional[Category] = None
+    destination_category: Optional[str] = None  # Allow any string value for category
     selection_rule: SelectionRule = "unspecified"
 
 
@@ -130,6 +149,27 @@ class NavigationResponse(BaseModel):
     parsed_command: ParsedCommand
     destination: Destination
     route: RouteData
+    debug_trace: list[str] = Field(default_factory=list)
+
+
+class UpdateProfileRequest(BaseModel):
+    user_id: int
+    home_address: str
+    work_address: str
+
+    @field_validator("home_address")
+    @classmethod
+    def home_address_must_not_be_empty(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("home_address cannot be empty")
+        return value
+
+    @field_validator("work_address")
+    @classmethod
+    def work_address_must_not_be_empty(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("work_address cannot be empty")
+        return value
 
 
 class DestinationCandidate(BaseModel):
