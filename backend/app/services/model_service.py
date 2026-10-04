@@ -79,15 +79,32 @@ def _load_model_bundle(model_name_or_path: str, hf_token: str):
                 )
             )
 
-        tokenizer = T5TokenizerFast.from_pretrained(str(model_path), token=hf_token or None)
+        try:
+            tokenizer = T5TokenizerFast.from_pretrained(str(model_path), local_files_only=True)
+        except Exception as exc:
+            raise ModelServiceError(f"Tokenizer loading failed: {exc}") from exc
+
         quantized_checkpoint = model_path / "quantized_model.pt"
         if quantized_checkpoint.is_file():
-            import torch
+            try:
+                import torch
 
-            model = torch.load(quantized_checkpoint, map_location="cpu", weights_only=False)
+                model = torch.load(quantized_checkpoint, map_location="cpu", weights_only=False)
+            except Exception as exc:
+                raise ModelServiceError(f"Quantized checkpoint loading failed: {exc}") from exc
         else:
-            model = T5ForConditionalGeneration.from_pretrained(str(model_path), token=hf_token or None)
-        model.eval()
+            try:
+                model = T5ForConditionalGeneration.from_pretrained(
+                    str(model_path),
+                    local_files_only=True,
+                )
+            except Exception as exc:
+                raise ModelServiceError(f"Transformers checkpoint loading failed: {exc}") from exc
+
+        try:
+            model.eval()
+        except Exception as exc:
+            raise ModelServiceError(f"Model initialization failed: {exc}") from exc
         return tokenizer, model
     except Exception as exc:
         raise ModelServiceError(f"Unable to load Hugging Face model '{model_name_or_path}': {exc}") from exc
@@ -152,8 +169,11 @@ class ModelService:
         logger.info(f"Model input prompt: {prompt}")
         inputs = tokenizer(prompt, return_tensors="pt", truncation=True)
 
-        with torch.no_grad():
-            generated_tokens = cast(Any, model).generate(**inputs, max_new_tokens=128)
+        try:
+            with torch.no_grad():
+                generated_tokens = cast(Any, model).generate(**inputs, max_new_tokens=128)
+        except Exception as exc:
+            raise ModelServiceError(f"Model generation failed: {exc}") from exc
 
         raw_text = tokenizer.decode(generated_tokens[0], skip_special_tokens=True)
         logger.info(f"Model raw output: '{raw_text}'")
