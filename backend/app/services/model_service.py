@@ -171,7 +171,11 @@ class ModelService:
 
         try:
             with torch.no_grad():
-                generated_tokens = cast(Any, model).generate(**inputs, max_new_tokens=128)
+                generated_tokens = cast(Any, model).generate(
+                    **inputs,
+                    max_new_tokens=128,
+                    early_stopping=False,
+                )
         except Exception as exc:
             raise ModelServiceError(f"Model generation failed: {exc}") from exc
 
