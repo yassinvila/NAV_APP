@@ -21,7 +21,7 @@ class ModelServiceError(RuntimeError):
 @lru_cache(maxsize=4)
 def _load_model_bundle(model_name_or_path: str, hf_token: str):
     try:
-        from transformers import T5ForConditionalGeneration, T5Tokenizer  # type: ignore[import-not-found]
+        from transformers import T5ForConditionalGeneration, T5TokenizerFast  # type: ignore[import-not-found]
         from huggingface_hub import login as hf_login
     except Exception as exc:  # pragma: no cover - import guard
         raise ModelServiceError(f"Transformers is unavailable: {exc}") from exc
@@ -80,7 +80,7 @@ def _load_model_bundle(model_name_or_path: str, hf_token: str):
             )
 
         try:
-            tokenizer = T5Tokenizer.from_pretrained(str(model_path), local_files_only=True)
+            tokenizer = T5TokenizerFast.from_pretrained(str(model_path), local_files_only=True)
         except Exception as exc:
             raise ModelServiceError(f"Tokenizer loading failed: {exc}") from exc
 

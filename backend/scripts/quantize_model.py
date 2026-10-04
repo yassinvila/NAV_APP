@@ -15,12 +15,12 @@ import argparse
 from pathlib import Path
 
 import torch
-from transformers import T5ForConditionalGeneration, T5Tokenizer
+from transformers import T5ForConditionalGeneration, T5TokenizerFast
 
 
 def quantize_model(model_name_or_path: str, output_dir: Path) -> None:
     print(f"Loading model: {model_name_or_path}")
-    tokenizer = T5Tokenizer.from_pretrained(model_name_or_path)
+    tokenizer = T5TokenizerFast.from_pretrained(model_name_or_path)
     model = T5ForConditionalGeneration.from_pretrained(model_name_or_path)
     model.eval()
 
