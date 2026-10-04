@@ -105,6 +105,21 @@ def _load_model_bundle(model_name_or_path: str, hf_token: str):
             model.eval()
         except Exception as exc:
             raise ModelServiceError(f"Model initialization failed: {exc}") from exc
+
+        try:
+            from transformers import GenerationConfig
+
+            generation_config = getattr(model, "generation_config", None)
+            if generation_config is not None:
+                defaults = GenerationConfig()
+                for name, default in defaults.to_dict().items():
+                    if getattr(generation_config, name, None) is None and default is not None:
+                        setattr(generation_config, name, default)
+                generation_config.early_stopping = False
+                generation_config.max_new_tokens = None
+        except Exception as exc:
+            raise ModelServiceError(f"Generation configuration failed: {exc}") from exc
+
         return tokenizer, model
     except Exception as exc:
         raise ModelServiceError(f"Unable to load Hugging Face model '{model_name_or_path}': {exc}") from exc
@@ -173,8 +188,17 @@ class ModelService:
             with torch.no_grad():
                 generated_tokens = cast(Any, model).generate(
                     **inputs,
-                    max_new_tokens=128,
+                    max_length=256,
+                    min_length=0,
                     early_stopping=False,
+                    do_sample=False,
+                    num_beams=1,
+                    length_penalty=1.0,
+                    no_repeat_ngram_size=0,
+                    repetition_penalty=1.0,
+                    encoder_repetition_penalty=1.0,
+                    num_return_sequences=1,
+                    use_cache=True,
                 )
         except Exception as exc:
             raise ModelServiceError(f"Model generation failed: {exc}") from exc
