@@ -20,7 +20,7 @@ class RateLimitMiddleware:
             return
 
         request = Request(scope, receive=receive)
-        if request.url.path == "/health":
+        if request.method == "OPTIONS" or request.url.path == "/health":
             await self.app(scope, receive, send)
             return
 

@@ -1,5 +1,6 @@
 import json
 import logging
+from pathlib import Path
 from dataclasses import dataclass
 from difflib import get_close_matches
 from functools import lru_cache
@@ -65,8 +66,14 @@ def _load_model_bundle(model_name_or_path: str, hf_token: str):
             # Non-fatal: if listing fails, we'll let from_pretrained raise the original error.
             pass
 
-        tokenizer = T5TokenizerFast.from_pretrained(model_name_or_path)
-        model = T5ForConditionalGeneration.from_pretrained(model_name_or_path)
+        tokenizer = T5TokenizerFast.from_pretrained(model_name_or_path, token=hf_token or None)
+        quantized_checkpoint = Path(model_name_or_path) / "quantized_model.pt"
+        if quantized_checkpoint.is_file():
+            import torch
+
+            model = torch.load(quantized_checkpoint, map_location="cpu", weights_only=False)
+        else:
+            model = T5ForConditionalGeneration.from_pretrained(model_name_or_path, token=hf_token or None)
         model.eval()
         return tokenizer, model
     except Exception as exc:

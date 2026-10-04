@@ -8,7 +8,7 @@ import DebugPanel from './components/DebugPanel'
 import RouteInfo from './components/RouteInfo'
 import SearchBox from './components/SearchBox'
 import { DEFAULT_USER_ID, MODEL_OPTIONS } from './config'
-import { getNavigationRoute, warmUpModel } from './services/api'
+import { getNavigationRoute } from './services/api'
 import './styles/App.css'
 
 const BETA_STORAGE_KEY = 'nav_beta_granted'
@@ -40,7 +40,6 @@ function App() {
   const [route, setRoute] = useState(null)
   const [routeGeometry, setRouteGeometry] = useState(null)
   const [debugTrace, setDebugTrace] = useState([])
-  const [modelWarmupError, setModelWarmupError] = useState('')
 
   const handleBetaAccessGranted = () => {
     window.localStorage.setItem(BETA_STORAGE_KEY, 'true')
@@ -64,28 +63,6 @@ function App() {
     window.localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(updatedUser))
     setAuthUser(updatedUser)
   }
-
-  useEffect(() => {
-    let active = true
-
-    warmUpModel('T5_NEMO')
-      .then((statuses) => {
-        const failedModels = Object.entries(statuses)
-          .filter(([, result]) => result.status === 'error')
-          .map(([model, result]) => `${model}: ${result.message}`)
-
-        if (active && failedModels.length > 0) {
-          setModelWarmupError(`Model warm-up issue — ${failedModels.join(' | ')}`)
-        }
-      })
-      .catch((warmupError) => {
-        if (active) setModelWarmupError(warmupError.message)
-      })
-
-    return () => {
-      active = false
-    }
-  }, [])
 
   useEffect(() => {
     if (!authUser || !navigator.geolocation) return
@@ -227,7 +204,6 @@ function App() {
           <RouteInfo route={route} destination={destination} />
           <DebugPanel debugTrace={debugTrace} />
           {locationError ? <p className="error-text">{locationError}</p> : null}
-          {modelWarmupError ? <p className="error-text">{modelWarmupError}</p> : null}
           {parsedCommand ? <p className="muted-text">Intent: {parsedCommand.intent}</p> : null}
         </section>
       </section>

@@ -47,7 +47,7 @@ The API will be available at `http://127.0.0.1:8000`.
 
 - `POST /navigation/route`
 - `GET /health`
-- `POST /models/warmup?model_key=T5_NEMO` loads one configured model into the Hugging Face disk cache and the backend process cache. The frontend preloads T5_NEMO when the app opens; T5_CLAUDE is loaded lazily if selected.
+- `POST /models/warmup?model_key=T5_NEMO` can manually load one configured model into the backend process cache. Models are now loaded on demand when a navigation request selects them.
 
 Authenticated endpoints use a JWT returned by registration and login. The frontend stores that token for the demo session and sends it with navigation and profile requests. API requests are limited to `RATE_LIMIT_REQUESTS` per `RATE_LIMIT_WINDOW_SECONDS` per client and endpoint. Outbound Mapbox requests use `REQUEST_TIMEOUT_SECONDS`.
 
@@ -58,6 +58,16 @@ python backend/scripts/check_claude_model.py
 ```
 
 The script reports the T5 configuration, shared embedding aliases, and whether sample outputs are valid JSON. It reads `HF_TOKEN_TWO` or `HF_TOKEN` from the environment when private model access is required.
+
+To create a CPU-only dynamic INT8 checkpoint for a trusted local model:
+
+```bash
+python backend/scripts/quantize_model.py \
+  --model yassinvila/nav_model_claude \
+  --output backend/models/nav_model_claude_int8
+```
+
+Point `T5_CLAUDE` at the generated directory to use its `quantized_model.pt` file. The generated model directory is ignored by Git because model artifacts should be stored in model hosting or deployment storage rather than committed to the source repository. Only load checkpoints generated and controlled by you; the loader uses trusted pickle deserialization for this format.
 
 ## Notes
 
