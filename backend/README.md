@@ -11,24 +11,38 @@ Minimal FastAPI backend for the natural-language navigation workflow.
 - Uses Mapbox Directions to build a route
 - Returns parsed command data, destination details, and route geometry
 
-## Start Up
+## Local startup
 
-1. Create and activate a virtual environment.
-2. Install dependencies:
+From Git Bash at the repository root:
 
 ```bash
-pip install -r requirements.txt
+python -m venv venv
+source venv/Scripts/activate
+cp .env.example .env
+cd backend
+python -m pip install -r requirements.txt
 ```
 
-3. Create a single `.env` file at the repository root and fill in your values.
-4. Start PostgreSQL and make sure `DATABASE_URL` points to it.
-5. Run the API from the `backend` folder:
+Start the API from the `backend` directory:
 
 ```bash
-uvicorn app.main:app --reload
+python -m uvicorn app.main:app --reload
 ```
 
 The API will be available at `http://127.0.0.1:8000`.
+
+## Configuration
+
+Copy `.env.example` to `.env` and set at least `MAPBOX_ACCESS_TOKEN`, `BETA_ACCESS_PIN`, and `JWT_SECRET`. SQLite is used by default for local development. Set `DATABASE_URL` to PostgreSQL for a deployed or shared environment.
+
+The default model settings use the public quantized repositories:
+
+```env
+T5_NEMO=yassinvila/nav_model_int8
+T5_CLAUDE=yassinvila/nav_model_claude_int8
+```
+
+Models are downloaded lazily on the first request that selects them. Keep Hugging Face tokens in `.env` or the deployment provider's secret settings; never commit them.
 
 ## Example Request
 
@@ -47,7 +61,7 @@ The API will be available at `http://127.0.0.1:8000`.
 
 - `POST /navigation/route`
 - `GET /health`
-- `POST /models/warmup?model_key=T5_NEMO` can manually load one configured model into the backend process cache. Models are now loaded on demand when a navigation request selects them.
+- `POST /models/warmup?model_key=T5_NEMO` can manually load one configured model into the backend process cache. The frontend does not call this endpoint automatically; models load on demand during navigation.
 
 Authenticated endpoints use a JWT returned by registration and login. The frontend stores that token for the demo session and sends it with navigation and profile requests. API requests are limited to `RATE_LIMIT_REQUESTS` per `RATE_LIMIT_WINDOW_SECONDS` per client and endpoint. Outbound Mapbox requests use `REQUEST_TIMEOUT_SECONDS`.
 

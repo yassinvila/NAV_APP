@@ -2,6 +2,7 @@ import pytest
 from unittest.mock import patch
 from app.services.model_service import ModelService, ModelServiceError
 from app.config import get_settings
+import app.services.model_service as model_service_module
 
 def test_parse_command_with_valid_place():
     service = ModelService(get_settings())
@@ -31,3 +32,34 @@ def test_parse_command_with_empty_output():
         with pytest.raises(ModelServiceError) as excinfo:
             service.parse_command("take me to nowhere")
         assert "Model generated empty output" in str(excinfo.value)
+
+
+def test_generation_uses_explicit_compatible_options(monkeypatch):
+    class FakeTokenizer:
+        def __call__(self, prompt, return_tensors, truncation):
+            return {"input_ids": [1]}
+
+        def decode(self, tokens, skip_special_tokens):
+            return '{"intent": "navigate_to_place", "name": "Empire State Building"}'
+
+    class FakeModel:
+        def eval(self):
+            return self
+
+        def generate(self, **kwargs):
+            assert kwargs["max_length"] == 256
+            assert kwargs["early_stopping"] is False
+            assert kwargs["do_sample"] is False
+            assert kwargs["num_beams"] == 1
+            assert kwargs["length_penalty"] == 1.0
+            return [[1]]
+
+    monkeypatch.setattr(
+        model_service_module,
+        "_load_model_bundle",
+        lambda model_name, token: (FakeTokenizer(), FakeModel()),
+    )
+
+    service = ModelService(get_settings())
+    result = service.parse_command("take me to the Empire State Building")
+    assert result.destination_name == "Empire State Building"

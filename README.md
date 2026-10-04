@@ -1,64 +1,103 @@
 # NAV_APP
 
-Natural-language navigation app with a FastAPI backend and a React + Vite frontend.
+Natural-language navigation demo with a FastAPI backend, a React/Vite frontend, Mapbox routing, and T5 command parsing.
 
-## What We Built
+## Repository layout
 
-### Backend
-- FastAPI app with `POST /navigation/route` for navigation requests.
-- Beta access endpoint with a PIN gate.
-- Username/password account creation and login endpoints.
-- PostgreSQL-backed saved location lookup for `home` and `work`.
-- Mapbox Geocoding and Directions integration handled only in the backend.
-- Shared root `.env` loading for configuration.
-- Dockerfile and backend startup instructions.
+- `backend/` - FastAPI API, model service, database models, tests, and model tools.
+- `frontend/` - React/Vite map interface.
+- `.env.example` - safe local configuration template.
+- `.env` - your local secrets and settings; never commit this file.
 
-### Frontend
-- Full-page Mapbox GL JS map display.
-- Browser geolocation for the user’s current location.
-- User marker, destination marker, and route line drawing.
-- Search box for natural-language navigation commands.
-- Route info panel for distance and duration.
-- Debug panel for parsed command, destination, and route payload.
-- Beta PIN gate shown before any login.
-- Username/password login and account creation flow with no email field.
-- Shared root `.env` loading for frontend configuration.
+## Run locally with Git Bash
 
-## What We Did Not Build Yet
+### 1. Create the environment
 
-- Persistent login sessions or JWT auth.
-- Password reset or account recovery.
-- Admin dashboard for managing beta access or users.
-- Full production hardening for auth, secrets, and rate limiting.
-- Seed scripts or migrations for PostgreSQL.
-- Frontend styling polish beyond a functional beta UI.
-- End-to-end automated tests.
-- A dedicated model-serving microservice; the backend now loads the T5 parser directly from the Hugging Face repo or local path.
+From the repository root:
 
-## Repository Layout
+```bash
+python -m venv venv
+source venv/Scripts/activate
+cp .env.example .env
+```
 
-- `backend/` contains the FastAPI API, database models, services, and backend README.
-- `frontend/` contains the React app, Mapbox UI, and frontend README.
-- `.env` at the repo root is the shared configuration file for both apps.
+Edit `.env` and provide a Mapbox token. For local development, SQLite is the default database. Use PostgreSQL by replacing `DATABASE_URL` when needed.
 
-## Current Flow
+### 2. Install backend dependencies
 
-1. User opens the frontend.
-2. Beta PIN gate appears first.
-3. User logs in or creates an account with username and password.
-4. The app asks for browser location access.
-5. User enters a navigation command.
-6. Frontend sends the command and current coordinates to the backend.
-7. Backend parses the command, resolves the destination, generates the route, and returns route data.
-8. Frontend renders the route and destination on the map.
+```bash
+cd backend
+python -m pip install -r requirements.txt
+```
 
-## Quick Start
+### 3. Start the backend
 
-1. Fill in the root `.env` file.
-2. Start PostgreSQL.
-3. Run the backend from `backend/`.
-4. Run the frontend from `frontend/`.
+Run this from the `backend` directory:
 
-For more detail, see:
-- [backend/README.md](backend/README.md)
-- [frontend/README.md](frontend/README.md)
+```bash
+python -m uvicorn app.main:app --reload
+```
+
+The API runs at `http://127.0.0.1:8000`. Verify it with:
+
+```bash
+curl http://127.0.0.1:8000/health
+```
+
+### 4. Start the frontend
+
+Open a second Git Bash window:
+
+```bash
+cd /c/Users/YASS/OneDrive/Desktop/NAV_APP/frontend
+npm install
+npm run dev
+```
+
+Open the Vite URL shown in the terminal, normally `http://localhost:5173`.
+
+## Models
+
+The default template points to the quantized CPU repositories:
+
+```env
+T5_NEMO=yassinvila/nav_model_int8
+T5_CLAUDE=yassinvila/nav_model_claude_int8
+```
+
+The backend downloads a selected model on its first navigation request. Public repositories do not require a token; set `HF_TOKEN` or `HF_TOKEN_TWO` only for private repositories. Model artifacts are not stored in Git.
+
+To create a quantized model locally:
+
+```bash
+python backend/scripts/quantize_model.py \
+  --model yassinvila/nav_model \
+  --output backend/models/nav_model_int8
+```
+
+To upload a generated model:
+
+```bash
+python backend/scripts/upload_model.py \
+  --folder backend/models/nav_model_int8 \
+  --repo YOUR_HF_USERNAME/nav_model_int8
+```
+
+## Useful commands
+
+Backend tests:
+
+```bash
+cd backend
+python -m pytest -q
+```
+
+Frontend lint and build:
+
+```bash
+cd frontend
+npm run lint
+npm run build
+```
+
+See [backend/README.md](backend/README.md) for API behavior, authentication, rate limits, and model tooling.

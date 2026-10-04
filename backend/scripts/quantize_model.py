@@ -12,16 +12,32 @@ The output directory contains the tokenizer/configuration and a trusted
 from __future__ import annotations
 
 import argparse
+import json
 from pathlib import Path
 
 import torch
+from huggingface_hub import snapshot_download
 from transformers import T5ForConditionalGeneration, T5TokenizerFast
 
 
 def quantize_model(model_name_or_path: str, output_dir: Path) -> None:
     print(f"Loading model: {model_name_or_path}")
-    tokenizer = T5TokenizerFast.from_pretrained(model_name_or_path)
-    model = T5ForConditionalGeneration.from_pretrained(model_name_or_path)
+    source_path = Path(model_name_or_path)
+    if not source_path.is_dir():
+        source_path = Path(snapshot_download(model_name_or_path, repo_type="model"))
+
+    source_tokenizer_config = source_path / "tokenizer_config.json"
+    if source_tokenizer_config.is_file():
+        tokenizer_config = json.loads(source_tokenizer_config.read_text(encoding="utf-8"))
+        if isinstance(tokenizer_config.get("extra_special_tokens"), list):
+            tokenizer_config.pop("extra_special_tokens")
+            source_tokenizer_config.write_text(
+                json.dumps(tokenizer_config, indent=2) + "\n",
+                encoding="utf-8",
+            )
+
+    tokenizer = T5TokenizerFast.from_pretrained(str(source_path), local_files_only=True)
+    model = T5ForConditionalGeneration.from_pretrained(str(source_path), local_files_only=True)
     model.eval()
 
     print("Applying dynamic INT8 quantization to linear layers...")
